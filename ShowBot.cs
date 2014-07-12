@@ -13,7 +13,7 @@ namespace ShowBot
     public class CommandLine
     {
         [Option("c", "conf", HelpText = "Load this config file. Default is showbot.conf")]
-        public string Conf = "showbot.conf";
+        public string Conf = "bot.conf";
 
         public HelpText GetHeader()
         {
@@ -108,6 +108,17 @@ namespace ShowBot
 
                     case "WebBase":
                         ret.WebBase = val;
+                        break;
+
+                    case "ServerSSL":
+                        if (val == "1" || val.ToLower() == "true" || val.ToLower() == "yes")
+                        {
+                            ret.ServerSSL = true;
+                        }
+                        else
+                        {
+                            ret.ServerSSL = false;
+                        }
                         break;
 
                     case "Channel":

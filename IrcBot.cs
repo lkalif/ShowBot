@@ -14,16 +14,17 @@ namespace ShowBot
     #region Helper and data model classes
     public class IrcServerInfo
     {
-        public string ServerID { get; set; }
-        public string ServerHost { get; set; }
-        public int ServerPort { get; set; }
-        public string Nick { get; set; }
-        public string Username { get; set; }
-        public string RealName { get; set; }
-        public string Password { get; set; }
-        public string WebBase { get; set; }
-        public string ApiAuth { get; set; }
-        public List<string> Channels { get; set; }
+        public string ServerID;
+        public string ServerHost;
+        public int ServerPort;
+        public bool ServerSSL;
+        public string Nick;
+        public string Username;
+        public string RealName;
+        public string Password;
+        public string WebBase;
+        public string ApiAuth;
+        public List<string> Channels;
 
         public IrcServerInfo()
         {
@@ -63,8 +64,8 @@ namespace ShowBot
 
         bool SentNickServLogin = false;
 
-        static Regex ChanCmdParser = new Regex(@"\s*!(?<cmd>\w+)\s*(?<arg>.+)?", RegexOptions.Compiled | RegexOptions.ExplicitCapture);
-        static Regex QueryCmdParser = new Regex(@"\s*!?(?<cmd>\w+)\s*(?<arg>.+)?", RegexOptions.Compiled | RegexOptions.ExplicitCapture);
+        static Regex ChanCmdParser = new Regex(@"^!(?<cmd>\w+)\s*(?<arg>.+)?", RegexOptions.Compiled | RegexOptions.ExplicitCapture);
+        static Regex QueryCmdParser = new Regex(@"^\s*!?(?<cmd>\w+)\s*(?<arg>.+)?", RegexOptions.Compiled | RegexOptions.ExplicitCapture);
         HttpClient WebClient;
 
         public IrcBot(IrcServerInfo c)
@@ -78,6 +79,8 @@ namespace ShowBot
             irc.AutoRejoinOnKick = false;
             irc.AutoRelogin = true;
             irc.AutoRetry = true;
+            irc.UseSsl = Conf.ServerSSL;
+            irc.ValidateServerCertificate = false;
             irc.AutoRetryDelay = 30;
             irc.CtcpVersion = "ShowBot by lkalif 1.0";
             irc.Encoding = Encoding.UTF8;
