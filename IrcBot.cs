@@ -53,6 +53,7 @@ namespace ShowBot
         public string User;
         public string Title;
     }
+
     #endregion Helper and data model classes
 
     public class IrcBot : IDisposable
@@ -154,14 +155,6 @@ namespace ShowBot
             PrintMsg("IRC - " + Conf.ServerID, string.Format("Connected"));
         }
 
-        string GetFuncUri(string func)
-        {
-            return string.Format("api.php?auth={0}&func={1}",
-                Uri.EscapeUriString(Conf.ApiAuth),
-                Uri.EscapeUriString(func)
-                );
-        }
-
         async Task<ResponseStatus> SendSuggestion(Sugggestion s)
         {
             try
@@ -232,34 +225,126 @@ namespace ShowBot
 
                     switch (cmd)
                     {
+                        case "s":
+                        case "suggest":
+                            {
+                                if (args.Length < 2)
+                                {
+                                    irc.SendReply(e.Data, "Usage: " + cmd + " #channel some suggestion here");
+                                    return;
+                                }
+
+                                var title = string.Join(" ", new ArraySegment<string>(args, 1, args.Length - 1));
+
+                                var req = new Sugggestion()
+                                {
+                                    ApiAuth = Conf.ApiAuth,
+                                    Function = "suggestion_add",
+                                    ServerID = Conf.ServerID,
+                                    Channel = args[0],
+                                    User = e.Data.Nick,
+                                    Title = title
+                                };
+
+                                var res = await SendSuggestion(req);
+                                irc.SendMessage(SendType.Message, e.Data.Nick, "Sending your suggestion " + (res.Success ? "was successful" : "failed") + ": " + res.Message);
+                            }
+                            break;
+
                         case "start":
                         case "reset":
-                            if (args.Length != 1 || string.IsNullOrEmpty(args[0]))
                             {
-                                irc.SendReply(e.Data, "Usage: " + cmd + " #channel - delete all titles and votes for the title suggestion on #channel");
-                                return;
-                            }
-                            
-                            var user = irc.GetChannelUser(args[0], e.Data.Nick);
-                            if (user == null)
-                            {
-                                irc.SendReply(e.Data, "Cannot find you in that channel");
-                                return;
-                            }
+                                if (args.Length != 1 || string.IsNullOrEmpty(args[0]))
+                                {
+                                    irc.SendReply(e.Data, "Usage: " + cmd + " #channel - delete all titles and votes for the title suggestion on #channel");
+                                    return;
+                                }
 
-                            if (!(user.IsIrcOp || user.IsOp))
+                                var user = irc.GetChannelUser(args[0], e.Data.Nick);
+                                if (user == null)
+                                {
+                                    irc.SendReply(e.Data, "Cannot find you in that channel");
+                                    return;
+                                }
+
+                                if (!(user.IsIrcOp || user.IsOp))
+                                {
+                                    irc.SendReply(e.Data, "You need to be a channel operator on " + args[0]);
+                                    return;
+                                }
+
+                                var req = new Request()
+                                {
+                                    ApiAuth = Conf.ApiAuth,
+                                    Function = "channel_reset",
+                                    ServerID = Conf.ServerID,
+                                    Channel = args[0],
+                                };
+
+                                try
+                                {
+                                    var response = await WebClient.PostAsJsonAsync<Request>("api.php", req);
+                                    var resp = await response.Content.ReadAsStringAsync();
+                                    ResponseStatus res = await response.Content.ReadAsAsync<ResponseStatus>();
+                                    irc.SendReply(e.Data, "Sending reset request " + (res.Success ? "was successful" : "failed") + ": " + res.Message);
+                                }
+                                catch (Exception ex)
+                                {
+                                    irc.SendReply(e.Data, "Failed sending reset request: " + ex.Message);
+                                    return;
+                                }
+                            }
+                            break;
+
+                        case "top":
                             {
-                                irc.SendReply(e.Data, "You need to be a channel operator on " + args[0]);
-                                return;
+                                if (args.Length != 1 || string.IsNullOrEmpty(args[0]))
+                                {
+                                    irc.SendReply(e.Data, "Usage: " + cmd + " #channel - get the top 5 suggestions for #channel");
+                                    return;
+                                }
+
+                                var req = new Request()
+                                {
+                                    ApiAuth = Conf.ApiAuth,
+                                    Function = "channel_top",
+                                    ServerID = Conf.ServerID,
+                                    Channel = args[0],
+                                };
+
+                                try
+                                {
+                                    var response = await WebClient.PostAsJsonAsync<Request>("api.php", req);
+                                    var resp = await response.Content.ReadAsStringAsync();
+                                    ResponseStatus res = await response.Content.ReadAsAsync<ResponseStatus>();
+                                    if (res.Success)
+                                    {
+                                        foreach (var line in SplitMessage(res.Message))
+                                        {
+                                            irc.SendReply(e.Data, line);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        irc.SendReply(e.Data, "Failed to get Top 5: " + res.Message);
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    irc.SendReply(e.Data, "Failed sending reset request: " + ex.Message);
+                                    return;
+                                }
                             }
 
                             break;
 
                         case "help":
                             irc.SendReply(e.Data, "ShowBot by lkalif:\n");
-                            irc.SendReply(e.Data, "reset #channel - delete all titles and votes for the title suggestion on #channel");
-                            irc.SendReply(e.Data, "top #channel - displays current top 5 on #channel");
-                            irc.SendReply(e.Data, "help - Displays this text");
+                            irc.SendReply(e.Data, "  suggest #channel some title suggestion for channel");
+                            irc.SendReply(e.Data, "  top #channel - displays current top 5 on #channel");
+                            irc.SendReply(e.Data, "  reset #channel - delete all suggestion and votes for #channel");
+                            irc.SendReply(e.Data, "     reset requires you to be an operator of #channel");
+                            irc.SendReply(e.Data, "  help - Displays this text");
                             break;
 
                         default:
