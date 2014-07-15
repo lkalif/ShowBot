@@ -25,11 +25,13 @@ namespace ShowBot
         public string WebBase;
         public string ApiAuth;
         public List<string> Channels;
+        public List<string> AdditionalOps;
 
         public IrcServerInfo()
         {
             ServerPort = 6667;
             Channels = new List<string>();
+            AdditionalOps = new List<string>();
             RealName = Password = string.Empty;
         }
     }
@@ -260,17 +262,20 @@ namespace ShowBot
                                     return;
                                 }
 
-                                var user = irc.GetChannelUser(args[0], e.Data.Nick);
-                                if (user == null)
+                                if (!Conf.AdditionalOps.Contains(e.Data.Nick))
                                 {
-                                    irc.SendReply(e.Data, "Cannot find you in that channel");
-                                    return;
-                                }
+                                    var user = irc.GetChannelUser(args[0], e.Data.Nick);
+                                    if (user == null)
+                                    {
+                                        irc.SendReply(e.Data, "Cannot find you in that channel");
+                                        return;
+                                    }
 
-                                if (!(user.IsIrcOp || user.IsOp))
-                                {
-                                    irc.SendReply(e.Data, "You need to be a channel operator on " + args[0]);
-                                    return;
+                                    if (!(user.IsIrcOp || user.IsOp))
+                                    {
+                                        irc.SendReply(e.Data, "You need to be a channel operator on " + args[0]);
+                                        return;
+                                    }
                                 }
 
                                 var req = new Request()
@@ -284,7 +289,6 @@ namespace ShowBot
                                 try
                                 {
                                     var response = await WebClient.PostAsJsonAsync<Request>("api.php", req);
-                                    var resp = await response.Content.ReadAsStringAsync();
                                     ResponseStatus res = await response.Content.ReadAsAsync<ResponseStatus>();
                                     irc.SendReply(e.Data, "Sending reset request " + (res.Success ? "was successful" : "failed") + ": " + res.Message);
                                 }

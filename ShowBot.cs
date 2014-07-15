@@ -136,6 +136,13 @@ namespace ShowBot
                         }
                         break;
 
+                    case "AdditionalOps":
+                        foreach (var op in Regex.Split(val, @"[\s,]+"))
+                        {
+                            ret.AdditionalOps.Add(op.Trim());
+                        }
+                        break;
+
                     default:
                         throw new ArgumentException("Uknown configuration setting " + key);
                 }
