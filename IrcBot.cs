@@ -48,6 +48,7 @@ namespace ShowBot
         public string Function;
         public string ServerID;
         public string Channel;
+        public string Title;
     }
 
     public class Sugggestion : Request
@@ -252,6 +253,62 @@ namespace ShowBot
                                 irc.SendMessage(SendType.Message, e.Data.Nick, "Sending your suggestion " + (res.Success ? "was successful" : "failed") + ": " + res.Message);
                             }
                             break;
+                            
+                        case "delete":
+                            {
+                                if (args.Length < 2 || string.IsNullOrEmpty(args[0]))
+                                {
+                                    irc.SendReply(e.Data, "Usage: " + cmd + " #channel title - delete title");
+                                    return;
+                                }
+
+                                if (!Conf.AdditionalOps.Contains(e.Data.Nick))
+                                {
+                                    var user = irc.GetChannelUser(args[0], e.Data.Nick);
+                                    if (user == null)
+                                    {
+                                        irc.SendReply(e.Data, "Cannot find you in that channel");
+                                        return;
+                                    }
+
+                                    if (!(user.IsIrcOp || user.IsOp))
+                                    {
+                                        irc.SendReply(e.Data, "You need to be a channel operator on " + args[0]);
+                                        return;
+                                    }
+                                }
+
+                                var title = m.Groups["arg"].Value;
+                                var t = Regex.Match(title, @"^.+? (?<title>.+)");
+                                
+                                if (t.Success)
+                                {
+                                    title = t.Groups["title"].Value;
+                                }
+
+                                var req = new Request()
+                                {
+                                    ApiAuth = Conf.ApiAuth,
+                                    Function = "title_delete",
+                                    ServerID = Conf.ServerID,
+                                    Channel = args[0],
+                                    Title = title,
+                                };
+
+                                try
+                                {
+                                    var response = await WebClient.PostAsJsonAsync<Request>("api.php", req);
+                                    ResponseStatus res = await response.Content.ReadAsAsync<ResponseStatus>();
+                                    irc.SendReply(e.Data, "Sending delete request " + (res.Success ? "was successful" : "failed") + ": " + res.Message);
+                                }
+                                catch (Exception ex)
+                                {
+                                    irc.SendReply(e.Data, "Failed sending reset request: " + ex.Message);
+                                    return;
+                                }
+                            }
+                            break;
+
 
                         case "start":
                         case "reset":
@@ -347,6 +404,7 @@ namespace ShowBot
                             irc.SendReply(e.Data, "  suggest #channel some title suggestion for channel");
                             irc.SendReply(e.Data, "  top #channel - displays current top 5 on #channel");
                             irc.SendReply(e.Data, "  reset #channel - delete all suggestion and votes for #channel");
+                            irc.SendReply(e.Data, "  delete #channel title - delete title from #channel");
                             irc.SendReply(e.Data, "     reset requires you to be an operator of #channel");
                             irc.SendReply(e.Data, "  help - Displays this text");
                             break;
